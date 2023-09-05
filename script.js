@@ -1,11 +1,13 @@
 "use strict";
 const fileReader = new FileReader()
 
-class Tile{
-    constructor(cost){
+class Tile {
+    constructor(x, y,cost){
         this.cost = cost;
         this.visited = false;
         this.visitable = cost > -1;
+        this.x = x;
+        this.y = y;
     }
 }
 
@@ -24,19 +26,22 @@ class Map{
         this.width = tiles2d[0].length;
     }
 
-    visit(x,y){
+    visit(x,y) {
         this.getTile(x,y).visited = true;
     }
     
-    visitable(x,y){
+    visitable(x,y) {
         return this.getTile(x,y).visitable;
     }
 
-    cost(x,y){
+    cost(x,y) {
         return this.getTile(x,y).cost;
     }
 
-    getTile(x,y){
+    getTile(x,y) {
+        if(y >= this.tiles2d.length || x >= this.tiles2d[0].length || x < 0 || y < 0) {
+            return null;
+        }
         return this.tiles2d[y][x];
     }
 }
@@ -57,16 +62,16 @@ class MapCanvas{
 
     drawMap() {
         console.log('\"darwmapo i have come to bargain\" -the bargainer')
-        this.map.tiles2d.forEach((row, y) => {row.forEach((tile, x) => {
-            this.drawTile(x, y, tile);
+        this.map.tiles2d.forEach(row => {row.forEach((tile) => {
+            this.drawTile(tile);
         })});
     }
 
-    drawTile(x, y, tile) {
+    drawTile(tile) {
         const visitableColor = tile.visited ? colors.visited : colors.unexplored;
         const color = tile.visitable ? visitableColor : colors.unvisitable;
-        const xCoord = this.tileSize * x;
-        const yCoord = this.tileSize * y;
+        const xCoord = this.tileSize * tile.x;
+        const yCoord = this.tileSize * tile.y;
         this.ctx.fillStyle = color;
         this.ctx.fillRect(xCoord, yCoord, this.tileSize, this.tileSize);
         this.ctx.strokeStyle = '1px solid black';
@@ -83,10 +88,45 @@ class MapCanvas{
     visit(x,y){
         if(this.map.visitable(x,y)){
             this.map.visit(x,y);
-            this.drawTile(x, y, this.map.getTile(x,y));
+            this.drawTile(x,y);
         }
         else {
             console.error("Nei fysj og fy nå prøvde du å besøga ein tile som ikkje går an å besøga kompis")
+        }
+    }
+
+    aStar(startNode, destNode) {
+        const open = [{node: startNode,
+        g: 0}];
+        const closed = [];
+        const successorNodes = [];
+        const currentNode = null;
+        const comparator = (node, prevNode) => node.g - prevNode.g;
+        while(open.length) {
+            open.sort(comparator);
+            currentNode = open.pop()
+            if (currentNode == destNode){
+                console.log("u win, congrat")
+                break
+            }
+            successorNodes += [
+                this.map.getTile(currentNode.x,currentNode.y-1),
+                this.map.getTile(currentNode.x-1,currentNode.y),
+                this.map.getTile(currentNode.x,currentNode.y+1),
+                this.map.getTile(currentNode.x+1,currentNode.y),
+            ].filter(node);
+            successorNodes.forEach(successorNode => {
+                // If open contains successornode
+                if (open.filter(node => node.node === successorNode.node).length) {
+                    if(successorNode.g > currentNode.g + successorNode.cost) {
+                        successorNode.g = currentNode.g + successorNode.cost
+                    }
+                }
+                else{
+                    open.push(successorNode)
+                    open.sort(comparator);
+                }
+            });
         }
     }
 }
@@ -110,7 +150,7 @@ function setcsv() {
       () => {
         const blobStr = reader.result
         const array = blobStr.split("\n").map((row) => row.split(","));
-        const tiles2d = array.map(row => row.map(number => new Tile(number))).filter(row => row.length > 1);
+        const tiles2d = array.map((row, y) => row.map((number, x) => new Tile(x, y, number))).filter(row => row.length > 1);
         const map = new Map(tiles2d);
         const mapCanvas = new MapCanvas(map, canvasDiv, 30);
         mapCanvas.drawMap();
@@ -122,4 +162,13 @@ function setcsv() {
     if (file) {
       reader.readAsText(file);
     }
-  }
+}
+
+/** Heuristic function implementing Euclidian distance 
+ * uses like pythagoras and such
+*/
+function h(startTile, destTile) {
+    const deltaX = destTile.x - startTile.x;
+    const deltaY = destTile.y - startTile.y;
+    return Math.sqrt(deltaX ** 2 + deltaY ** 2);
+}
