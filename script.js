@@ -145,7 +145,6 @@ class MapCanvas{
         startTile.open = true;
         while(open.length){
             this.astarIter(open, destTile, traceback, closed);
-            this.drawMap();
         }
     }
 
