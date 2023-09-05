@@ -1,8 +1,5 @@
 "use strict";
 const fileReader = new FileReader();
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 class Tile {
     constructor(x, y,cost){
         this.cost = Number.parseInt(cost);
@@ -132,7 +129,7 @@ class MapCanvas{
         }
     }
 
-    async aStar(startTile, destTile) {
+    aStar(startTile, destTile) {
         startTile.startTile = true;
         destTile.destTile = true;
         const traceback = (node) => {
