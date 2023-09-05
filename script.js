@@ -1,6 +1,8 @@
 "use strict";
 const fileReader = new FileReader();
-
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 class Tile {
     constructor(x, y,cost){
         this.cost = Number.parseInt(cost);
@@ -60,6 +62,16 @@ class Map{
     }
 }
 
+class Node{
+    constructor(tile,parent){
+        this.tile = tile;
+        this.f = 0;
+        this.parent = parent;
+        this.h = 0;
+        this.g = 0;
+    }
+}
+
 class MapCanvas{
     constructor(map,parent,tileSize){
         this.map = map
@@ -86,7 +98,7 @@ class MapCanvas{
     }
 
     drawMap() {
-        console.log('\"darwmapo i have come to bargain\" -the bargainer')
+        // console.log('\"darwmapo i have come to bargain\" -the bargainer')
         this.map.tiles2d.forEach(row => {row.forEach((tile) => {
             this.drawTile(tile);
         })});
@@ -120,93 +132,56 @@ class MapCanvas{
         }
     }
 
-    aStar(startNode, destNode) {
-        startNode.startTile = true;
-        destNode.destTile = true;
-        // 1 Open list starts at start node
-        const open = [{node: startNode,
-        g: 0, 
-        parent: null}];
-        const closed = [];
-        let currentNode = null;
-        const nodeInit = (node) => {
-            return {node, g: 0, parent: null}
+    async aStar(startTile, destTile) {
+        startTile.startTile = true;
+        destTile.destTile = true;
+        const traceback = (node) => {
+            if (node){
+                node.tile.path = true;
+                traceback(node.parent);
+            }
         }
-
-        const traverseParents = (node) => {
-            if (node) {
-                console.log(node);
-                node.node.path = true;
-                traverseParents(node.parent);
-            }
-        };
         
-        const comparator = (node, prevNode) => f(prevNode, destNode) - f(node, destNode);
-        
-        // 2 While open list is not empty
-        while(open.length) {
-            // 3,4 Take node from open with lowest f. Assumes open array is sorted descending w.r.t. f.
-            currentNode = open.pop();
-
-            // 5 If the current node is the destination node we have found a solution. 
-            if (currentNode.node === destNode){
-                console.log("u win, congrat");
-                traverseParents(currentNode);
-                this.drawMap()
-                break;
-            }
-            
-            // 6 Get all nodes one can visit from current node
-            const successorNodes = [
-                nodeInit(this.map.getTile(currentNode.node.x,currentNode.node.y-1)),
-                nodeInit(this.map.getTile(currentNode.node.x-1,currentNode.node.y)),
-                nodeInit(this.map.getTile(currentNode.node.x,currentNode.node.y+1)),
-                nodeInit(this.map.getTile(currentNode.node.x+1,currentNode.node.y)),
-            ].filter(currentNode => {
-                return currentNode.node.cost > -1
-            });
-            // 7 Check all possible next nodes
-            successorNodes.forEach(successorNode => {
-                // 8 Set cost of travelling to successorNode to current node + cost 
-                const successorCurrCost = currentNode.g + successorNode.cost
-                
-                // 9 If open contains successornode
-                if (open.filter(node => node.node === successorNode.node).length) {
-                    // 10
-                    if (successorCurrCost> currentNode.g + successorNode.cost) {
-                        return; // 10 Continue to next step in forEach iteration
-                    }
-                }
-                // 11 If closed contains successor node and this path is cheaper
-                else if (closed.filter(node => node.node === successorNode.node).length) {
-                    // 13
-                    if (successorCurrCost > currentNode.g + successorNode.cost){
-                        const i = closed.findIndex(node => node.node === successorNode.node);
-                        closed.splice(i, 1); // Remove element from closed
-                        open.push(successorNode);
-                        successorNode.node.setOpen();
-                        open.sort(comparator);
-                    }
-                    // 12
-                    else return;
-                }
-                // 14
-                else {
-                    // 15
-                    open.push(successorNode)
-                    successorNode.node.setOpen()
-                    open.sort(comparator);
-                }
-                successorNode.g = successorCurrCost; // 18
-                successorNode.parent = currentNode; // 19
-            });
-            closed.push(currentNode) // 21
-            currentNode.node.setClosed()
+        const open = [];
+        const closed = [];
+        open.push(new Node(startTile, null));
+        startTile.open = true;
+        while(open.length){
+            this.astarIter(open, destTile, traceback, closed);
             this.drawMap();
         }
-        if (currentNode.node !== destNode) {
-            console.error('Det finnes ingen vei.');
-        }
+    }
+
+    astarIter(open, destTile, traceback, closed) {
+        let q = open.pop();
+        q.tile.open = false;
+        [
+            new Node(this.map.getTile(q.tile.x - 1, q.tile.y), q),
+            new Node(this.map.getTile(q.tile.x + 1, q.tile.y), q),
+            new Node(this.map.getTile(q.tile.x, q.tile.y - 1), q),
+            new Node(this.map.getTile(q.tile.x, q.tile.y + 1), q),
+        ].filter((successor) => successor.tile && successor.tile.visitable).forEach(successor => {
+            if (successor.tile === destTile) {
+                console.log("goal found");
+                traceback(successor);
+                this.drawMap();
+                throw new Error("we did it");
+            }
+            successor.g = q.g + successor.tile.cost;
+            successor.h = Math.abs(successor.tile.x - destTile.x) + Math.abs(successor.tile.y - destTile.y);
+            successor.f = successor.g + successor.h;
+            if (open.filter((node) => node.tile === successor.tile && node.f < successor.f).length) {
+                return;
+            }
+            if (closed.filter((node) => node.tile === successor.tile && node.f < successor.f).length) {
+                return;
+            }
+            open.push(successor);
+            successor.tile.open = true;
+            open.sort((a, b) => b.f - a.f);
+        });
+        closed.push(q);
+        q.tile.closed = true;
     }
 }
 
@@ -244,25 +219,14 @@ function mazeInit(blobStr) {
     const map = new Map(tiles2d);
     const mapCanvas = new MapCanvas(map, canvasDiv, 30);
     mapCanvas.drawMap();
-    mapCanvas.aStar(map.getTile(35, 41), map.getTile(32, 28));
+    mapCanvas.aStar(map.getTile(18, 40), map.getTile(18, 6));
+    // mapCanvas.aStar(map.getTile(18, 6),map.getTile(32, 40));
+
+    // mapCanvas.aStar(map.getTile(17, 27), map.getTile(27, 26));
+    // mapCanvas.aStar(map.getTile(17, 27), map.getTile(16, 27));
+    // mapCanvas.aStar(map.getTile(17, 27), map.getTile(18, 27));
     mapCanvas.drawMap();
 }
 
 const blobStr = document.getElementById('data').innerHTML;
-mazeInit(blobStr);
-
-/** Heuristic function implementing Euclidian distance 
- * uses like pythagoras and such
-*/
-function h(startTile, destTile) {
-    const deltaX = destTile.x - startTile.x;
-    const deltaY = destTile.y - startTile.y;
-    return Math.abs(deltaX) + Math.abs(deltaY);
-}
-
-/**
- * Assumes input nodes on form {node, g, parent}
- */
-function f(currentNode, destNode) {
-    return h(currentNode.node, destNode) + currentNode.g;
-}
+mazeInit(blobStr); 
