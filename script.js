@@ -115,6 +115,9 @@ class MapCanvas {
         });
     }
 
+    // returns true if 
+    hasBetterOption = (arr, succ) => arr.filter(node => node.tile === succ.tile && node.f <= succ.f).length;
+
     /**
      * gui function to draw a tile.
      * @param {*} tile the tile you wish to draw on the gui.
@@ -207,27 +210,15 @@ class MapCanvas {
                     }
                     colorPath(successor);
                 }
-
-
                 successor.g = q.g + successor.tile.cost;
-
-                // manhattan heuristic
                 successor.h = Math.abs(successor.tile.x - destTile.x) + Math.abs(successor.tile.y - destTile.y);
                 successor.f = successor.g + successor.h;
-                
-                // returns true if 
-                const hasBetterOption = (arr, succ) => arr.filter(node => node.tile === succ.tile && node.f < succ.f).length;
-                if (hasBetterOption(open, successor)) {
-                    return;
-                }
 
-
-                if (hasBetterOption(closed, successor)) {
-                    return;
+                if (!(hasBetterOption(open, successor) || hasBetterOption(closed, successor))) {
+                    open.push(successor);
+                    open.sort((a, b) => b.f - a.f);
+                    successor.tile.setOpen();
                 }
-                open.push(successor);
-                open.sort((a, b) => b.f - a.f);
-                successor.tile.setOpen();
             });
         closed.push(q);
         q.tile.setClosed();
