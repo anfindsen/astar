@@ -191,7 +191,6 @@ class MapCanvas {
         node.tile.path = false;
         if (node.parent) {
             this.uncolorPath(node.parent);
-            this.drawMap() // gui
         }
     }
 
