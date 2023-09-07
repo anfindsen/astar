@@ -215,7 +215,6 @@ class MapCanvas {
                 if (successor.tile === destTile) {
                     console.log("bra jobba karar dokk vant");
                     win = true;
-                    
                     this.colorPath(successor);
                 }
                 successor.g = q.g + successor.tile.cost;
