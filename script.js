@@ -2,7 +2,7 @@
 const fileReader = new FileReader();
 
 class Tile {
-    constructor(x, y,cost){
+    constructor(x, y, cost) {
         this.cost = Number.parseInt(cost);
         this.visitable = cost > -1;
         this.x = x;
@@ -13,7 +13,7 @@ class Tile {
         this.isStartTile = false;
         this.isDestTile = false;
     }
-    
+
     setOpen() {
         if (!this.visitable) throw new Error("Node is not visitable");
         this.open = true;
@@ -27,42 +27,60 @@ class Tile {
 }
 
 const colors = {
-    open:           'rgb(200, 200, 200)',
-    closed:         'rgb(150, 150, 150)',
-    unexplored:     'rgb(255, 255, 255)',
-    path:           'rgb(255, 255,   0)',
-    unvisitable:    'rgb(255,   0,   0)',
-    start:          'rgb(  0,   0, 255)',
-    dest:           'rgb(255, 192, 203)',
-    text:           'rgb(  0,   0,   0)',
+    open: 'rgb(200, 200, 200)',
+    closed: 'rgb(150, 150, 150)',
+    unexplored: 'rgb(255, 255, 255)',
+    path: 'rgb(255, 255,   0)',
+    unvisitable: 'rgb(255,   0,   0)',
+    start: 'rgb(  0,   0, 255)',
+    dest: 'rgb(   0, 255,   0)',
+    text: 'rgb(  0,   0,   0)',
 }
 
-class Map{
-    constructor(tiles2d){
+class Map {
+    constructor(tiles2d) {
         this.tiles2d = tiles2d;
         this.height = tiles2d.length;
         this.width = tiles2d[0].length;
     }
-    
-    visitable(x,y) {
-        return this.getTile(x,y).visitable;
+
+    visitable(x, y) {
+        return this.getTile(x, y).visitable;
     }
 
-    cost(x,y) {
-        return this.getTile(x,y).cost;
+    cost(x, y) {
+        return this.getTile(x, y).cost;
     }
 
-    getTile(x,y) {
-        if(y >= this.tiles2d.length || x >= this.tiles2d[0].length || x < 0 || y < 0) {
+    getTile(x, y) {
+        if (y >= this.tiles2d.length || x >= this.tiles2d[0].length || x < 0 || y < 0) {
             return null;
         }
         return this.tiles2d[y][x];
     }
 }
 
-class MapCanvas{
-    constructor(map,parent,tileSize){
-        this.map = map
+class Node {
+    constructor(tile, parent) {
+        this.tile = tile;
+        this.parent = parent;
+        this.h;
+        this.f;
+        this.g;
+    }
+}
+
+function logTileUnderCursor (e, tileSize) {
+    const cursorX = e.offsetX;
+    const cursorY = e.offsetY;
+    console.log("X: " + Math.floor(cursorX / tileSize) + "\nY: " +
+        Math.floor(cursorY / tileSize));
+    return {x: Math.floor(cursorX / tileSize), y: Math.floor(cursorY / tileSize)};
+}
+
+class MapCanvas {
+    constructor(map, parent, tileSize) {
+        this.map = map;
         this.height = map.height;
         this.width = map.width;
         this.parent = parent;
@@ -72,13 +90,6 @@ class MapCanvas{
         this.canvas.width = this.width * this.tileSize;
         this.parent.appendChild(this.canvas);
         this.ctx = this.canvas.getContext('2d');
-        
-        const logTileUnderCursor = (e, tileSize) => {
-            const cursorX = e.offsetX;
-            const cursorY = e.offsetY;
-            console.log("X: " + Math.floor(cursorX/tileSize) + "\nY: " + 
-            Math.floor(cursorY/tileSize));
-        }
         const onClick = (e) => logTileUnderCursor(e, tileSize);
         this.canvas.onclick = this.logTileUnderCursor;
         this.canvas.addEventListener('click', onClick);
@@ -87,20 +98,22 @@ class MapCanvas{
 
     drawMap() {
         console.log('\"darwmapo i have come to bargain\" -the bargainer')
-        this.map.tiles2d.forEach(row => {row.forEach((tile) => {
-            this.drawTile(tile);
-        })});
+        this.map.tiles2d.forEach(row => {
+            row.forEach((tile) => {
+                this.drawTile(tile);
+            })
+        });
     }
 
     drawTile(tile) {
 
         const getColor = (tile) => {
-            if(tile.startTile) return colors.start;
-            if(tile.destTile) return colors.dest;
-            if(tile.path) return colors.path;
-            if(tile.closed) return colors.closed;
-            if(tile.open) return colors.open;
-            if(!tile.visitable) return colors.unvisitable;
+            if (tile.isStartTile) return colors.start;
+            if (tile.isDestTile) return colors.dest;
+            if (tile.path) return colors.path;
+            if (tile.closed) return colors.closed;
+            if (tile.open) return colors.open;
+            if (!tile.visitable) return colors.unvisitable;
             return colors.unexplored;
         }
         const color = getColor(tile);
@@ -113,128 +126,105 @@ class MapCanvas{
         this.ctx.font = this.tileSize * 0.5 + 'px Comic Sans MS'
         this.ctx.textBaseline = 'middle';
         this.ctx.textAlign = 'center';
-        if (tile.visitable){
+        if (tile.visitable) {
             this.ctx.fillText(tile.cost, xCoord + this.tileSize / 2, yCoord +
                 this.tileSize / 2)
             this.ctx.strokeRect(xCoord, yCoord, this.tileSize, this.tileSize);
         }
     }
 
-    aStar(startNode, destNode) {
-        startNode.startTile = true;
-        destNode.destTile = true;
-        // 1 Open list starts at start node
-        const open = [{node: startNode,
-        g: 0, 
-        parent: null}];
+   async aStar(startTile, destTile) {
+        let win = false;
+        startTile.isStartTile = true;
+        destTile.isDestTile = true;
+        const open = [];
         const closed = [];
-        let currentNode = null;
-        const nodeInit = (node) => {
-            return {node, g: 0, parent: null}
+        open.push(new Node(startTile, null));
+        open[0].f = 0;
+        open[0].g = 0;
+        const generateSuccessors = (node) => [
+            generateSuccessor(node, -1, 0),
+            generateSuccessor(node, 1, 0),
+            generateSuccessor(node, 0, -1),
+            generateSuccessor(node, 0, 1)
+        ];
+        const generateSuccessor = (node, xChange, yChange) => new Node(
+            this.map.getTile(node.tile.x + xChange, node.tile.y + yChange), node);
+        const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay))
+        while (open.length && !win) {
+            // qurrent node
+            await sleep(1);
+            win = this.astarIteration(open, generateSuccessors, destTile, win, closed);
+            this.drawMap()
         }
+    }
 
-        const traverseParents = (node) => {
-            if (node) {
-                console.log(node);
-                node.node.path = true;
-                traverseParents(node.parent);
-            }
-        };
-        
-        const comparator = (node, prevNode) => f(prevNode, destNode) - f(node, destNode);
-        
-        // 2 While open list is not empty
-        while(open.length) {
-            // 3,4 Take node from open with lowest f. Assumes open array is sorted descending w.r.t. f.
-            currentNode = open.pop();
+    astarIteration(open, generateSuccessors, destTile, win, closed) {
+        const q = open.pop();
 
-            // 5 If the current node is the destination node we have found a solution. 
-            if (currentNode.node === destNode){
-                console.log("u win, congrat");
-                traverseParents(currentNode);
-                this.drawMap()
-                break;
-            }
-            
-            // 6 Get all nodes one can visit from current node
-            const successorNodes = [
-                nodeInit(this.map.getTile(currentNode.node.x,currentNode.node.y-1)),
-                nodeInit(this.map.getTile(currentNode.node.x-1,currentNode.node.y)),
-                nodeInit(this.map.getTile(currentNode.node.x,currentNode.node.y+1)),
-                nodeInit(this.map.getTile(currentNode.node.x+1,currentNode.node.y)),
-            ].filter(currentNode => {
-                return currentNode.node.cost > -1
-            });
-            // 7 Check all possible next nodes
-            successorNodes.forEach(successorNode => {
-                // 8 Set cost of travelling to successorNode to current node + cost 
-                const successorCurrCost = currentNode.g + successorNode.cost
-                
-                // 9 If open contains successornode
-                if (open.filter(node => node.node === successorNode.node).length) {
-                    // 10
-                    if (successorCurrCost> currentNode.g + successorNode.cost) {
-                        return; // 10 Continue to next step in forEach iteration
+        generateSuccessors(q).filter(successor => successor.tile && successor.tile.visitable).forEach(
+            successor => {
+                if (successor.tile === destTile) {
+                    console.log("bra jobba karar dokk vant");
+                    win = true;
+                    const colorPath = (node) => {
+                        node.tile.path = true;
+                        if (node.parent) {
+                            colorPath(node.parent);
+                        }
                     }
+                    colorPath(successor);
                 }
-                // 11 If closed contains successor node and this path is cheaper
-                else if (closed.filter(node => node.node === successorNode.node).length) {
-                    // 13
-                    if (successorCurrCost > currentNode.g + successorNode.cost){
-                        const i = closed.findIndex(node => node.node === successorNode.node);
-                        closed.splice(i, 1); // Remove element from closed
-                        open.push(successorNode);
-                        successorNode.node.setOpen();
-                        open.sort(comparator);
-                    }
-                    // 12
-                    else return;
+
+
+                successor.g = q.g + successor.tile.cost;
+                successor.h = Math.abs(successor.tile.x - destTile.x) + Math.abs(successor.tile.y - destTile.y);
+                successor.f = successor.g + successor.h;
+
+                const hasBetterOption = (arr, succ) => arr.filter(node => node.tile === succ.tile && node.f < succ.f).length;
+                if (hasBetterOption(open, successor)) {
+                    return;
                 }
-                // 14
-                else {
-                    // 15
-                    open.push(successorNode)
-                    successorNode.node.setOpen()
-                    open.sort(comparator);
+
+
+                if (hasBetterOption(closed, successor)) {
+                    return;
                 }
-                successorNode.g = successorCurrCost; // 18
-                successorNode.parent = currentNode; // 19
+                open.push(successor);
+                open.sort((a, b) => b.f - a.f);
+                successor.tile.setOpen();
             });
-            closed.push(currentNode) // 21
-            currentNode.node.setClosed()
-            this.drawMap();
-        }
-        if (currentNode.node !== destNode) {
-            console.error('Det finnes ingen vei.');
-        }
+        closed.push(q);
+        q.tile.setClosed();
+        return win;
     }
 }
 
 const canvasDiv = document.getElementById("canvasdiv");
-if(!canvasDiv) {
+if (!canvasDiv) {
     console.error("bæbubæbu me he problem, divven te canvas finst ikkje")
 }
 const fileSelector = document.getElementById('fileselector')
 
-if(!fileSelector) {
+if (!fileSelector) {
     console.error("bæbubæbu me he problem, file selector finst ikkje")
 }
 
 function setcsv() {
     const [file] = document.querySelector("input[type=file]").files;
     const reader = new FileReader();
-  
+
     reader.addEventListener(
-      "load",
-      () => {
-        const blobStr = reader.result;
-        mazeInit(blobStr);
-      },
-      false,
+        "load",
+        () => {
+            const blobStr = reader.result;
+            mazeInit(blobStr);
+        },
+        false,
     );
 
     if (file) {
-      reader.readAsText(file);
+        reader.readAsText(file);
     }
 }
 
@@ -244,25 +234,58 @@ function mazeInit(blobStr) {
     const map = new Map(tiles2d);
     const mapCanvas = new MapCanvas(map, canvasDiv, 30);
     mapCanvas.drawMap();
-    mapCanvas.aStar(map.getTile(35, 41), map.getTile(32, 28));
+    mapCanvas.aStar(map.getTile(18, 40), map.getTile(4, 9));
     mapCanvas.drawMap();
 }
 
-const blobStr = document.getElementById('data').innerHTML;
-mazeInit(blobStr);
 
-/** Heuristic function implementing Euclidian distance 
- * uses like pythagoras and such
-*/
-function h(startTile, destTile) {
-    const deltaX = destTile.x - startTile.x;
-    const deltaY = destTile.y - startTile.y;
-    return Math.abs(deltaX) + Math.abs(deltaY);
+const selectEl = document.getElementById('select');
+selectEl.addEventListener('change', () =>{
+    startPos = null;
+    endPos = null;
+    canvasDiv.innerHTML = "";
+    const blobStr = document.getElementById('data'+selectEl.value).innerHTML;
+    // mazeInit(blobStr);
+    
+    const array = blobStr.split("\n").map((row) => row.split(",")).filter(row => row.length > 1);
+    const tiles2d = array.map((row, y) => row.map((number, x) => new Tile(x, y, number))).filter(row => row.length > 1);
+    const map = new Map(tiles2d);
+    const tileSize = 30;
+    const mapCanvas = new MapCanvas(map, canvasDiv, tileSize);
+    mapCanvas.drawMap();
+    mapCanvas.canvas.addEventListener('click', (e) => onClick(e, mapCanvas, tileSize));
+});
+
+/** Expects blobStr on same format as mazeInit, startPos and destPos on format {x: number, y: number} */
+function astarInit(startPos, destPos, mapCanvas) {
+    mapCanvas.drawMap();
+    mapCanvas.aStar(mapCanvas.map.getTile(startPos.x, startPos.y), mapCanvas.map.getTile(destPos.x, destPos.y));
+    mapCanvas.drawMap();
 }
 
-/**
- * Assumes input nodes on form {node, g, parent}
- */
-function f(currentNode, destNode) {
-    return h(currentNode.node, destNode) + currentNode.g;
+let startPos;
+let endPos;
+
+function onClick(e, mapCanvas, tileSize) {
+    if (!endPos){
+        const pos = logTileUnderCursor(e, tileSize);
+
+        const tile = mapCanvas.map.getTile(pos.x, pos.y);
+        if(!tile.visitable) {
+            return;
+        }
+        if(startPos){
+            endPos = pos;
+            tile.isDestTile = true;
+            astarInit(startPos, endPos, mapCanvas)
+            return;
+        }
+        startPos = pos;
+        tile.isStartTile = true;
+        mapCanvas.drawMap()
+    }
 }
+
+
+
+
