@@ -181,7 +181,19 @@ class MapCanvas {
         while (open.length && !win) {
             await sleep(1); // for animation
             win = this.astarIteration(open, generateSuccessors, destTile, win, closed);
-            this.drawMap() // gui
+        }
+    }
+
+    colorPath = (node) => {
+                        node.tile.path = true;
+                        if (node.parent) {
+                            this.colorPath(node.parent);
+                        }
+                    }
+    uncolorPath = (node) => {
+        node.tile.path = false;
+        if (node.parent) {
+            this.uncolorPath(node.parent);
         }
     }
 
@@ -196,19 +208,15 @@ class MapCanvas {
      */
     astarIteration(open, generateSuccessors, destTile, win, closed) {
         const q = open.pop();
+        this.colorPath(q);
 
         generateSuccessors(q).filter(successor => successor.tile && successor.tile.visitable).forEach(
             successor => {
                 if (successor.tile === destTile) {
                     console.log("bra jobba karar dokk vant");
                     win = true;
-                    const colorPath = (node) => {
-                        node.tile.path = true;
-                        if (node.parent) {
-                            colorPath(node.parent);
-                        }
-                    }
-                    colorPath(successor);
+                    
+                    this.colorPath(successor);
                 }
                 successor.g = q.g + successor.tile.cost;
                 successor.h = Math.abs(successor.tile.x - destTile.x) + Math.abs(successor.tile.y - destTile.y);
@@ -222,6 +230,8 @@ class MapCanvas {
             });
         closed.push(q);
         q.tile.setClosed();
+        this.drawMap();
+        this.uncolorPath(q);
         return win;
     }
 }
