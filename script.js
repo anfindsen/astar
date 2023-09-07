@@ -70,6 +70,13 @@ class Node {
     }
 }
 
+/**
+ * logs tile under the cursor to console
+ * @param {*} e - event from onclick
+ * @param {*} tileSize - tileSize of the mapCanvas
+ * @returns returns an object with x and y property corresponding to x and y of 
+ * tile under cursor.
+ */
 function logTileUnderCursor (e, tileSize) {
     const cursorX = e.offsetX;
     const cursorY = e.offsetY;
@@ -96,6 +103,9 @@ class MapCanvas {
 
     }
 
+    /**
+     * iterates over all tiles in the map and draws all of them.
+     */
     drawMap() {
         console.log('\"darwmapo i have come to bargain\" -the bargainer')
         this.map.tiles2d.forEach(row => {
@@ -105,6 +115,10 @@ class MapCanvas {
         });
     }
 
+    /**
+     * gui function to draw a tile.
+     * @param {*} tile the tile you wish to draw on the gui.
+     */
     drawTile(tile) {
 
         const getColor = (tile) => {
@@ -133,15 +147,25 @@ class MapCanvas {
         }
     }
 
+    /**
+     * 
+     * @param {*} startTile - the Tile the algorithm should start search in.
+     * @param {*} destTile  - the Tile the algorithm should find the lowest
+     * cost path to.
+     */
    async aStar(startTile, destTile) {
         let win = false;
+        // for gui
         startTile.isStartTile = true;
         destTile.isDestTile = true;
+
+        // algorithm
         const open = [];
         const closed = [];
         open.push(new Node(startTile, null));
         open[0].f = 0;
         open[0].g = 0;
+        // cannot walk diagonally 
         const generateSuccessors = (node) => [
             generateSuccessor(node, -1, 0),
             generateSuccessor(node, 1, 0),
@@ -150,10 +174,9 @@ class MapCanvas {
         ];
         const generateSuccessor = (node, xChange, yChange) => new Node(
             this.map.getTile(node.tile.x + xChange, node.tile.y + yChange), node);
-        const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay))
+        const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
         while (open.length && !win) {
-            // qurrent node
-            await sleep(1);
+            await sleep(1); // for animation
             win = this.astarIteration(open, generateSuccessors, destTile, win, closed);
         }
     }
@@ -168,9 +191,19 @@ class MapCanvas {
         node.tile.path = false;
         if (node.parent) {
             this.uncolorPath(node.parent);
+            this.drawMap() // gui
         }
     }
 
+    /**
+     * one iteration of aStar. should only be called by astar
+     * @param {*} open
+     * @param {*} generateSuccessors 
+     * @param {*} destTile 
+     * @param {*} win 
+     * @param {*} closed 
+     * @returns boolean whether we found the destination or not
+     */
     astarIteration(open, generateSuccessors, destTile, win, closed) {
         const q = open.pop();
         this.colorPath(q);
@@ -186,9 +219,12 @@ class MapCanvas {
 
 
                 successor.g = q.g + successor.tile.cost;
-                successor.h = Math.abs(successor.tile.x - destTile.x) + Math.abs(successor.tile.y - destTile.y);
-                successor.f = successor.g + successor.h;
 
+                // manhattan heuristic
+                successor.h = Math.abs(successor.tile.x - destTile.x) + Math.abs(successor.tile.y - destTile.y);
+                successor.f = successor.g + successor.h;              
+  
+                // returns true if 
                 const hasBetterOption = (arr, succ) => arr.filter(node => node.tile === succ.tile && node.f <= succ.f).length;
                 if (hasBetterOption(open, successor)) {
                     return;
