@@ -222,7 +222,7 @@ class MapCanvas {
                 successor.h = Math.abs(successor.tile.x - destTile.x) + Math.abs(successor.tile.y - destTile.y);
                 successor.f = successor.g + successor.h;
 
-                if (!(hasBetterOption(open, successor) || hasBetterOption(closed, successor))) {
+                if (!(this.hasBetterOption(open, successor) || this.hasBetterOption(closed, successor))) {
                     open.push(successor);
                     open.sort((a, b) => b.f - a.f);
                     successor.tile.setOpen();
