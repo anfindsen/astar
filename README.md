@@ -1,3 +1,3 @@
 # astar
 A*
-astar in ts
+astar in ts test
